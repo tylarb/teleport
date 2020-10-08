@@ -1,0 +1,22 @@
+name: Auto merge upstream
+on:
+  schedule:
+  - cron: '0 0 * * *'
+jobs:
+  merge:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Merge upstream
+      run: |
+        git config --global user.name 'Tyler Ramer'
+        git config --global user.email 'tylarb@users.noreply.github.com'
+
+        git pull --unshallow
+        git remote add upstream https://github.com/gravitational/teleport.git
+        git fetch upstream
+
+        git checkout tracking
+        git merge --ff-only upstream/master
+        git push origin tracking
+
