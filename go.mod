@@ -35,9 +35,9 @@ require (
 	github.com/gravitational/configure v0.0.0-20160909185025-1db4b84fe9db
 	github.com/gravitational/form v0.0.0-20151109031454-c4048f792f70
 	github.com/gravitational/kingpin v2.1.11-0.20190130013101-742f2714c145+incompatible
-	github.com/gravitational/license v0.0.0-20180912170534-4f189e3bd6e3
+	github.com/gravitational/license v0.0.0-20180912170534-4f189e3bd6e3 // indirect
 	github.com/gravitational/oxy v0.0.0-20200916204440-3eb06d921a1d
-	github.com/gravitational/reporting v0.0.0-20180907002058-ac7b85c75c4c
+	github.com/gravitational/reporting v0.0.0-20180907002058-ac7b85c75c4c // indirect
 	github.com/gravitational/roundtrip v1.0.0
 	github.com/gravitational/trace v1.1.6
 	github.com/gravitational/ttlmap v0.0.0-20171116003245-91fd36b9004c
@@ -99,6 +99,7 @@ require (
 	k8s.io/apimachinery v0.20.0-alpha.1.0.20200922235617-829ed199f4e0
 	k8s.io/client-go v0.0.0-20200827131824-5d33118d4742
 	launchpad.net/gocheck v0.0.0-20140225173054-000000000087 // indirect
+	tailscale.com v1.1.0
 )
 
 replace (

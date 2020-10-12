@@ -1362,6 +1362,63 @@ func (a *AuthWithRoles) ValidateGithubAuthCallback(q url.Values) (*GithubAuthRes
 	return a.authServer.ValidateGithubAuthCallback(q)
 }
 
+func (a *AuthWithRoles) CreateTailscaleConnector(connector services.TailscaleConnector) error {
+	if err := a.authConnectorAction(defaults.Namespace, services.KindTailscale, services.VerbCreate); err != nil {
+		return trace.Wrap(err)
+	}
+	return a.authServer.CreateTailscaleConnector(connector)
+}
+
+// UpsertTailscaleConnector creates or updates a Tailscale connector.
+func (a *AuthWithRoles) UpsertTailscaleConnector(ctx context.Context, connector services.TailscaleConnector) error {
+	if err := a.authConnectorAction(defaults.Namespace, services.KindTailscale, services.VerbCreate); err != nil {
+		return trace.Wrap(err)
+	}
+	if err := a.authConnectorAction(defaults.Namespace, services.KindTailscale, services.VerbUpdate); err != nil {
+		return trace.Wrap(err)
+	}
+	return a.authServer.upsertTailscaleConnector(ctx, connector)
+}
+
+func (a *AuthWithRoles) GetTailscaleConnector(id string, withSecrets bool) (services.TailscaleConnector, error) {
+	if err := a.authConnectorAction(defaults.Namespace, services.KindTailscale, services.VerbReadNoSecrets); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if withSecrets {
+		if err := a.authConnectorAction(defaults.Namespace, services.KindTailscale, services.VerbRead); err != nil {
+			return nil, trace.Wrap(err)
+		}
+	}
+	return a.authServer.Identity.GetTailscaleConnector(id, withSecrets)
+}
+
+func (a *AuthWithRoles) GetTailscaleConnectors(withSecrets bool) ([]services.TailscaleConnector, error) {
+	if err := a.authConnectorAction(defaults.Namespace, services.KindTailscale, services.VerbList); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if err := a.authConnectorAction(defaults.Namespace, services.KindTailscale, services.VerbReadNoSecrets); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if withSecrets {
+		if err := a.authConnectorAction(defaults.Namespace, services.KindTailscale, services.VerbRead); err != nil {
+			return nil, trace.Wrap(err)
+		}
+	}
+	return a.authServer.Identity.GetTailscaleConnectors(withSecrets)
+}
+
+// DeleteTailscaleConnector deletes a Tailscale connector by name.
+func (a *AuthWithRoles) DeleteTailscaleConnector(ctx context.Context, connectorID string) error {
+	if err := a.authConnectorAction(defaults.Namespace, services.KindTailscale, services.VerbDelete); err != nil {
+		return trace.Wrap(err)
+	}
+	return a.authServer.deleteTailscaleConnector(ctx, connectorID)
+}
+
+func (a *AuthWithRoles) AuthenticateTailscaleRequest(req services.TailscaleAuthRequest) (*TailscaleAuthResponse, error) {
+	return a.authServer.AuthenticateTailscaleRequest(req)
+}
+
 // EmitAuditEvent emits a single audit event
 func (a *AuthWithRoles) EmitAuditEvent(ctx context.Context, event events.AuditEvent) error {
 	if err := a.action(defaults.Namespace, services.KindEvent, services.VerbCreate); err != nil {

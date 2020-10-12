@@ -249,6 +249,9 @@ const (
 	// ConnectorGithub means connector type Github
 	ConnectorGithub = "github"
 
+	// ConnectorTailscale means connector type Tailscale
+	ConnectorTailscale = "tailscale"
+
 	// DataDirParameterName is the name of the data dir configuration parameter passed
 	// to all backends during initialization
 	DataDirParameterName = "data_dir"
@@ -278,6 +281,9 @@ const (
 
 	// Local means authentication will happen locally within the Teleport cluster.
 	Local = "local"
+
+	// Tailscale mean authentication will happen by ensuring connection is from tailscale IP
+	Tailscale = ConnectorTailscale
 
 	// OIDC means authentication will happen remotely using an OIDC connector.
 	OIDC = ConnectorOIDC

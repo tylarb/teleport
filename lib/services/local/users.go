@@ -1205,6 +1205,94 @@ func (s *IdentityService) GetGithubAuthRequest(stateToken string) (*services.Git
 	return &req, nil
 }
 
+// CreateTailscaleConnector creates a new Tailscale connector
+func (s *IdentityService) CreateTailscaleConnector(connector services.TailscaleConnector) error {
+	if err := connector.CheckAndSetDefaults(); err != nil {
+		return trace.Wrap(err)
+	}
+	value, err := services.GetTailscaleConnectorMarshaler().Marshal(connector)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	item := backend.Item{
+		Key:     backend.Key(webPrefix, connectorsPrefix, tailscalePrefix, connectorsPrefix, connector.GetName()),
+		Value:   value,
+		Expires: connector.Expiry(),
+	}
+	_, err = s.Create(context.TODO(), item)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	return nil
+}
+
+// UpsertTailscaleConnector creates or updates a Tailscale connector
+func (s *IdentityService) UpsertTailscaleConnector(connector services.TailscaleConnector) error {
+	if err := connector.CheckAndSetDefaults(); err != nil {
+		return trace.Wrap(err)
+	}
+	value, err := services.GetTailscaleConnectorMarshaler().Marshal(connector)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	item := backend.Item{
+		Key:     backend.Key(webPrefix, connectorsPrefix, tailscalePrefix, connectorsPrefix, connector.GetName()),
+		Value:   value,
+		Expires: connector.Expiry(),
+		ID:      connector.GetResourceID(),
+	}
+	_, err = s.Put(context.TODO(), item)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	return nil
+}
+
+// GetTailscaleConnectors returns all configured Tailscale connectors
+func (s *IdentityService) GetTailscaleConnectors(withSecrets bool) ([]services.TailscaleConnector, error) {
+	startKey := backend.Key(webPrefix, connectorsPrefix, tailscalePrefix, connectorsPrefix)
+	result, err := s.GetRange(context.TODO(), startKey, backend.RangeEnd(startKey), backend.NoLimit)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	connectors := make([]services.TailscaleConnector, len(result.Items))
+	for i, item := range result.Items {
+		connector, err := services.GetTailscaleConnectorMarshaler().Unmarshal(item.Value)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		connectors[i] = connector
+	}
+	return connectors, nil
+}
+
+// GetTailscaleConnectot returns a particular Tailscale connector
+func (s *IdentityService) GetTailscaleConnector(name string, withSecrets bool) (services.TailscaleConnector, error) {
+	if name == "" {
+		return nil, trace.BadParameter("missing parameter name")
+	}
+	item, err := s.Get(context.TODO(), backend.Key(webPrefix, connectorsPrefix, tailscalePrefix, connectorsPrefix, name))
+	if err != nil {
+		if trace.IsNotFound(err) {
+			return nil, trace.NotFound("tailscale connector %q is not configured", name)
+		}
+		return nil, trace.Wrap(err)
+	}
+	connector, err := services.GetTailscaleConnectorMarshaler().Unmarshal(item.Value)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return connector, nil
+}
+
+// DeleteTailscaleConnector deletes the specified connector
+func (s *IdentityService) DeleteTailscaleConnector(name string) error {
+	if name == "" {
+		return trace.BadParameter("missing parameter name")
+	}
+	return trace.Wrap(s.Delete(context.TODO(), backend.Key(webPrefix, connectorsPrefix, tailscalePrefix, connectorsPrefix, name)))
+}
+
 const (
 	webPrefix                    = "web"
 	usersPrefix                  = "users"
@@ -1217,6 +1305,7 @@ const (
 	oidcPrefix                   = "oidc"
 	samlPrefix                   = "saml"
 	githubPrefix                 = "github"
+	tailscalePrefix              = "tailscale"
 	requestsPrefix               = "requests"
 	u2fRegChalPrefix             = "adduseru2fchallenges"
 	usedTOTPPrefix               = "used_totp"

@@ -408,6 +408,14 @@ func localSettings(authClient auth.ClientI, cap services.AuthPreference) (client
 	return as, nil
 }
 
+func tailscaleSettings(authClient auth.ClientI, cap services.AuthPreference) (client.AuthenticationSettings, error) {
+	as := client.AuthenticationSettings{
+		Type: teleport.Tailscale,
+	}
+
+	return as, nil
+}
+
 func oidcSettings(connector services.OIDCConnector, cap services.AuthPreference) client.AuthenticationSettings {
 	return client.AuthenticationSettings{
 		Type: teleport.OIDC,
@@ -454,6 +462,11 @@ func defaultAuthenticationSettings(authClient auth.ClientI) (client.Authenticati
 	switch cap.GetType() {
 	case teleport.Local:
 		as, err = localSettings(authClient, cap)
+		if err != nil {
+			return client.AuthenticationSettings{}, trace.Wrap(err)
+		}
+	case teleport.Tailscale:
+		as, err = tailscaleSettings(authClient, cap)
 		if err != nil {
 			return client.AuthenticationSettings{}, trace.Wrap(err)
 		}
@@ -559,6 +572,15 @@ func (h *Handler) pingWithConnector(w http.ResponseWriter, r *http.Request, p ht
 
 	if connectorName == teleport.Local {
 		as, err := localSettings(h.cfg.ProxyClient, cap)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		response.Auth = as
+		return response, nil
+	}
+
+	if connectorName == teleport.Tailscale {
+		as, err := tailscaleSettings(h.cfg.ProxyClient, cap)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
@@ -1957,6 +1979,35 @@ func (h *Handler) createSSHCertWithU2FSignResponse(w http.ResponseWriter, r *htt
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
+	return cert, nil
+}
+
+// createTailscaleCert is a web call that generates new SSH certificate based
+// on tailscale user access and public key user wishes to sign
+//
+// POST /v1/webapi/ssh/certs
+//
+// { "IP": "100.87.80.58", "pub_key": "key to sign", "ttl": 1000000000 }
+//
+// Success response
+//
+// { "cert": "base64 encoded signed cert", "host_signers": [{"domain_name": "example.com", "checking_keys": ["base64 encoded public signing key"]}] }
+//
+func (h *Handler) createTailscaleCert(w http.ResponseWriter, r *http.Request, p httprouter.Params) (interface{}, error) {
+	var req *client.CreateTailscaleCertReq
+	if err := httplib.ReadJSON(r, &req); err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	authClient := h.cfg.ProxyClient
+
+	var cert *auth.SSHLoginResponse
+
+	cert, err = h.auth.GetCertificateWithTailscale(*req)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
 	return cert, nil
 }
 

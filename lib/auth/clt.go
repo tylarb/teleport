@@ -2044,6 +2044,119 @@ func (c *Client) ValidateGithubAuthCallback(q url.Values) (*GithubAuthResponse, 
 	return &response, nil
 }
 
+// CreateTailscaleConnector creates a new Tailscale connector
+func (c *Client) CreateTailscaleConnector(connector services.TailscaleConnector) error {
+	bytes, err := services.GetTailscaleConnectorMarshaler().Marshal(connector)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	_, err = c.PostJSON(c.Endpoint("github", "connectors"), &createTailscaleConnectorRawReq{
+		Connector: bytes,
+	})
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	return nil
+}
+
+// UpsertTailscaleConnector creates or updates a Tailscale connector
+func (c *Client) UpsertTailscaleConnector(ctx context.Context, connector services.TailscaleConnector) error {
+	bytes, err := services.GetTailscaleConnectorMarshaler().Marshal(connector)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	_, err = c.PutJSON(c.Endpoint("github", "connectors"), &upsertTailscaleConnectorRawReq{
+		Connector: bytes,
+	})
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	return nil
+}
+
+// GetTailscaleConnectors returns all configured Tailscale connectors
+func (c *Client) GetTailscaleConnectors(withSecrets bool) ([]services.TailscaleConnector, error) {
+	out, err := c.Get(c.Endpoint("tailscale", "connectors"), url.Values{
+		"with_secrets": []string{strconv.FormatBool(withSecrets)},
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	var items []json.RawMessage
+	if err := json.Unmarshal(out.Bytes(), &items); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	connectors := make([]services.TailscaleConnector, len(items))
+	for i, raw := range items {
+		connector, err := services.GetTailscaleConnectorMarshaler().Unmarshal(raw)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		connectors[i] = connector
+	}
+	return connectors, nil
+}
+
+// GetTailscaleConnector returns the specified Tailscale connector
+func (c *Client) GetTailscaleConnector(id string, withSecrets bool) (services.TailscaleConnector, error) {
+	out, err := c.Get(c.Endpoint("tailscale", "connectors", id), url.Values{
+		"with_secrets": []string{strconv.FormatBool(withSecrets)},
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return services.GetTailscaleConnectorMarshaler().Unmarshal(out.Bytes())
+}
+
+// DeleteTailscaleConnector deletes the specified Tailscale connector
+func (c *Client) DeleteTailscaleConnector(ctx context.Context, id string) error {
+	_, err := c.Delete(c.Endpoint("tailscale", "connectors", id))
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	return nil
+}
+
+// ValidateTailscaleAuthCallback validates Tailscale auth callback returned from redirect
+func (c *Client) AuthenticateTailscaleRequest(req services.TailscaleAuthRequest) (*TailscaleAuthResponse, error) {
+
+	out, err := c.PostJSON(c.Endpoint("tailscale", "requests", "authenticate"),
+		req,
+	)
+
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	var rawResponse tailscaleAuthRawResponse
+	if err := json.Unmarshal(out.Bytes(), &rawResponse); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	response := TailscaleAuthResponse{
+		Username: rawResponse.Username,
+		Identity: rawResponse.Identity,
+		Cert:     rawResponse.Cert,
+		Req:      rawResponse.Req,
+		TLSCert:  rawResponse.TLSCert,
+	}
+	if len(rawResponse.Session) != 0 {
+		session, err := services.GetWebSessionMarshaler().UnmarshalWebSession(
+			rawResponse.Session)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		response.Session = session
+	}
+	response.HostSigners = make([]services.CertAuthority, len(rawResponse.HostSigners))
+	for i, raw := range rawResponse.HostSigners {
+		ca, err := services.GetCertAuthorityMarshaler().UnmarshalCertAuthority(raw)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		response.HostSigners[i] = ca
+	}
+	return &response, nil
+}
+
 // ResumeAuditStream resumes existing audit stream
 func (c *Client) ResumeAuditStream(ctx context.Context, sid session.ID, uploadID string) (events.Stream, error) {
 	return c.createOrResumeAuditStream(ctx, proto.AuditStreamRequest{
@@ -2998,6 +3111,19 @@ type IdentityService interface {
 
 	// GetSignupU2FRegisterRequest generates sign request for user trying to sign up with invite token
 	GetSignupU2FRegisterRequest(token string) (*u2f.RegisterRequest, error)
+
+	// CreateTailscaleConnector creates a new Tailscale connector
+	CreateTailscaleConnector(connector services.TailscaleConnector) error
+	// UpsertTailscaleConnector creates or updates a Tailscale connector
+	UpsertTailscaleConnector(ctx context.Context, connector services.TailscaleConnector) error
+	// GetTailscaleConnectors returns all configured Tailscale connectors
+	GetTailscaleConnectors(withSecrets bool) ([]services.TailscaleConnector, error)
+	// GetTailscaleConnector returns the specified Tailscale connector
+	GetTailscaleConnector(id string, withSecrets bool) (services.TailscaleConnector, error)
+	// DeleteTailscaleConnector deletes the specified Tailscale connector
+	DeleteTailscaleConnector(ctx context.Context, id string) error
+	// AuthenticateTailscaleRequest Authenticates using tailscale
+	AuthenticateTailscaleRequest(services.TailscaleAuthRequest) (*TailscaleAuthResponse, error)
 
 	// GetUser returns user by name
 	GetUser(name string, withSecrets bool) (services.User, error)

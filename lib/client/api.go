@@ -22,6 +22,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -1662,6 +1663,11 @@ func (tc *TeleportClient) Login(ctx context.Context, activateKey bool) (*Key, er
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
+	case teleport.Tailscale:
+		response, err = tc.tailscaleLogin(ctx, key.Pub)
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
 	case teleport.OIDC:
 		response, err = tc.ssoLogin(ctx, pr.Auth.OIDC.Name, key.Pub, teleport.OIDC)
 		if err != nil {
@@ -1971,6 +1977,35 @@ func (tc *TeleportClient) localLogin(ctx context.Context, secondFactor string, p
 	}
 
 	return response, nil
+}
+
+// tailscaleLogin
+func (tc *TeleportClient) tailscaleLogin(ctx context.Context, pub []byte) (*auth.SSHLoginResponse, error) {
+	addr, _, err := interfaces.Tailscale()
+
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if addr == nil {
+		return nil, trace.Wrap(errors.New("No Tailscale interface available, unable to connect"))
+	}
+
+	// ask the CA (via proxy) to sign our public key:
+	response, err := SSHAgentLogin(ctx, SSHLoginTailscale{
+		SSHLogin: SSHLogin{
+			ProxyAddr:         tc.WebProxyAddr,
+			PubKey:            pub,
+			TTL:               tc.KeyTTL,
+			Insecure:          tc.InsecureSkipVerify,
+			Pool:              loopbackPool(tc.WebProxyAddr),
+			Compatibility:     tc.CertificateFormat,
+			RouteToCluster:    tc.SiteName,
+			KubernetesCluster: tc.KubernetesCluster,
+		},
+		IP: addr.String(),
+	})
+
+	return response, trace.Wrap(err)
 }
 
 // AddTrustedCA adds a new CA as trusted CA for this client, used in tests

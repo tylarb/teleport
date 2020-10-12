@@ -78,6 +78,9 @@ const (
 	// KindGithub is Github connector resource
 	KindGithub = "github"
 
+	// KindTailscale is Tailscale connector resource
+	KindTailscale = "tailscale"
+
 	// KindOIDCRequest is OIDC auth request resource
 	KindOIDCRequest = "oidc_request"
 
@@ -86,6 +89,9 @@ const (
 
 	// KindGithubRequest is Github auth request resource
 	KindGithubRequest = "github_request"
+
+	// KindTailscaleRequest is Tailscale auth request resource
+	KindTailscaleRequest = "tailscale_request"
 
 	// KindSession is a recorded SSH session.
 	KindSession = "session"
@@ -125,6 +131,9 @@ const (
 
 	// KindGithubConnector is Github OAuth2 connector resource
 	KindGithubConnector = "github"
+
+	// KindTailscaleConnector is Tailscale OAuth2 connector resource
+	KindTailscaleConnector = "tailscale"
 
 	// KindConnectors is a shortcut for all authentication connector types.
 	KindConnectors = "connectors"
@@ -747,6 +756,8 @@ func ParseShortcut(in string) (string, error) {
 		return KindSAMLConnector, nil
 	case KindGithubConnector:
 		return KindGithubConnector, nil
+	case KindTailscaleConnector:
+		return KindTailscaleConnector, nil
 	case KindConnectors, "connector":
 		return KindConnectors, nil
 	case KindUser, "users":

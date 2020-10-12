@@ -139,6 +139,27 @@ type CreateSSHCertWithU2FReq struct {
 	KubernetesCluster string
 }
 
+// CreateTailscaleCertReq are passed by web client
+// to authenticate against teleport server and receive
+// a temporary cert signed by auth server authority
+type CreateTailscaleCertReq struct {
+	// IP is the IP of the requesting tailscale client
+	IP string `json:"IP"`
+	// PubKey is a public key user wishes to sign
+	PubKey []byte `json:"pub_key"`
+	// TTL is a desired TTL for the cert (max is still capped by server,
+	// however user can shorten the time)
+	TTL time.Duration `json:"ttl"`
+	// Compatibility specifies OpenSSH compatibility flags.
+	Compatibility string `json:"compatibility,omitempty"`
+	// RouteToCluster is an optional cluster name to route the response
+	// credentials to.
+	RouteToCluster string
+	// KubernetesCluster is an optional k8s cluster name to route the response
+	// credentials to.
+	KubernetesCluster string
+}
+
 // PingResponse contains data about the Teleport server like supported
 // authentication types, server version, etc.
 type PingResponse struct {
@@ -200,6 +221,14 @@ type SSHLoginDirect struct {
 	Password string
 	// User is the optional OTP token for the login.
 	OTPToken string
+}
+
+// SSHLoginTailscale contains SSH login parameters for teleport (ip/
+// login.
+type SSHLoginTailscale struct {
+	SSHLogin
+	// IP is the login IP.
+	IP string
 }
 
 // SSHLoginU2F contains SSH login parameters for U2F login.
@@ -469,6 +498,34 @@ func SSHAgentLogin(ctx context.Context, login SSHLoginDirect) (*auth.SSHLoginRes
 		User:              login.User,
 		Password:          login.Password,
 		OTPToken:          login.OTPToken,
+		PubKey:            login.PubKey,
+		TTL:               login.TTL,
+		Compatibility:     login.Compatibility,
+		RouteToCluster:    login.RouteToCluster,
+		KubernetesCluster: login.KubernetesCluster,
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	var out *auth.SSHLoginResponse
+	err = json.Unmarshal(re.Bytes(), &out)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	return out, nil
+}
+
+// SSHTailscaleLogin is used by tsh to validate tailscale auth and login as tailscale user.
+func SSHTailscaleLogin(ctx context.Context, login SSHLoginTailscale) (*auth.SSHLoginResponse, error) {
+	clt, _, err := initClient(login.ProxyAddr, login.Insecure, login.Pool)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+
+	re, err := clt.PostJSON(ctx, clt.Endpoint("webapi", "ssh", "certs"), CreateSSHCertReq{
+		IP:                login.IP,
 		PubKey:            login.PubKey,
 		TTL:               login.TTL,
 		Compatibility:     login.Compatibility,

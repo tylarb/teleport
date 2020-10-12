@@ -211,6 +211,21 @@ type Identity interface {
 	// GetGithubAuthRequest retrieves Github auth request by the token
 	GetGithubAuthRequest(stateToken string) (*GithubAuthRequest, error)
 
+	// CreateTailscaleConnector creates a new Tailscale connector
+	CreateTailscaleConnector(connector TailscaleConnector) error
+
+	// UpsertTailscaleConnector creates or updates a new Tailscale connector
+	UpsertTailscaleConnector(connector TailscaleConnector) error
+
+	// GetTailscaleConnectors returns all configured Tailscale connectors
+	GetTailscaleConnectors(withSecrets bool) ([]TailscaleConnector, error)
+
+	// GetTailscaleConnector returns a Tailscale connector by its name
+	GetTailscaleConnector(name string, withSecrets bool) (TailscaleConnector, error)
+
+	// DeleteTailscaleConnector deletes a Tailscale connector by its name
+	DeleteTailscaleConnector(name string) error
+
 	// CreateResetPasswordToken creates a token
 	CreateResetPasswordToken(ctx context.Context, resetPasswordToken ResetPasswordToken) (ResetPasswordToken, error)
 
@@ -296,6 +311,29 @@ type GithubAuthRequest struct {
 	// ClientRedirectURL is the URL where client will be redirected after
 	// successful auth
 	ClientRedirectURL string `json:"client_redirect_url"`
+	// Compatibility specifies OpenSSH compatibility flags
+	Compatibility string `json:"compatibility,omitempty"`
+	// Expires is a global expiry time header can be set on any resource in the system.
+	Expires *time.Time `json:"expires,omitempty"`
+	// RouteToCluster is the name of Teleport cluster to issue credentials for.
+	RouteToCluster string `json:"route_to_cluster,omitempty"`
+	// KubernetesCluster is the name of Kubernetes cluster to issue credentials for.
+	KubernetesCluster string `json:"kubernetes_cluster,omitempty"`
+}
+
+// TailscaleAuthRequest is the request to start Tailscale connection
+type TailscaleAuthRequest struct {
+	// IP is the connecting IP addr
+	IP string `json:"ip"`
+	// ConnectorID is the name of the connector to use
+	ConnectorID string `json:"connector_id"`
+	// Type is opaque string that helps callbacks identify the request type
+	Type string `json:"type"`
+	// PublicKey is an optional public key to sign in case of successful auth
+	PublicKey []byte `json:"public_key"`
+	// CreateWebSession indicates that a user wants to generate a web session
+	// after successul authentication
+	CreateWebSession bool `json:"create_web_session"`
 	// Compatibility specifies OpenSSH compatibility flags
 	Compatibility string `json:"compatibility,omitempty"`
 	// Expires is a global expiry time header can be set on any resource in the system.

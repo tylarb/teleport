@@ -237,6 +237,16 @@ var (
 		Name: GithubConnectorDeletedEvent,
 		Code: GithubConnectorDeletedCode,
 	}
+	// TailscaleConnectorCreatedE is emitted when a Tailscale connector is created/updated.
+	TailscaleConnectorCreatedE = Event{
+		Name: TailscaleConnectorCreatedEvent,
+		Code: TailscaleConnectorCreatedCode,
+	}
+	// TailscaleConnectorDeletedE is emitted when a Tailscale connector is deleted.
+	TailscaleConnectorDeletedE = Event{
+		Name: TailscaleConnectorDeletedEvent,
+		Code: TailscaleConnectorDeletedCode,
+	}
 	// OIDCConnectorCreatedE is emitted when an OIDC connector is created/updated.
 	OIDCConnectorCreatedE = Event{
 		Name: OIDCConnectorCreatedEvent,
@@ -282,6 +292,10 @@ const (
 	UserSSOLoginCode = "T1001I"
 	// UserSSOLoginFailureCode is the unsuccessful SSO user login event code.
 	UserSSOLoginFailureCode = "T1001W"
+	// UserTailscaleLoginCode is the successful local user login event code.
+	UserTailscaleLoginCode = "T1000I"
+	// UserTailscaleLoginFailureCode is the unsuccessful local user login event code.
+	UserTailscaleLoginFailureCode = "T1000W"
 	// UserCreateCode is the user create event code.
 	UserCreateCode = "T1002I"
 	// UserUpdateCode is the user update event code.
@@ -376,6 +390,11 @@ const (
 	SAMLConnectorCreatedCode = "T8200I"
 	// SAMLConnectorDeletedCode is the SAML connector deleted event code.
 	SAMLConnectorDeletedCode = "T8201I"
+
+	// TailscaleConnectorCreatedCode is the Github connector created event code.
+	TailscaleConnectorCreatedCode = "T8300I"
+	// TailscaleConnectorDeletedCode is the Github connector deleted event code.
+	TailscaleConnectorDeletedCode = "T8301I"
 
 	// RoleCreatedCode is the role created event code.
 	RoleCreatedCode = "T9000I"

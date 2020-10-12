@@ -154,6 +154,8 @@ const (
 	LoginMethodSAML = "saml"
 	// LoginMethodGithub represents login with Github
 	LoginMethodGithub = "github"
+	// LoginMethodTailscale represents login with Tailscale
+	LoginMethodTailscale = "tailscale"
 
 	// UserUpdatedEvent is emitted when the user is updated.
 	UserUpdatedEvent = "user.update"
@@ -320,6 +322,10 @@ const (
 	GithubConnectorCreatedEvent = "github.created"
 	// GithubConnectorDeletedEvent fires when a Github connector is deleted.
 	GithubConnectorDeletedEvent = "github.deleted"
+	// TailscaleConnectorCreatedEvent fires when a Tailscale connector is created/updated.
+	TailscaleConnectorCreatedEvent = "tailscale.created"
+	// TailscaleConnectorDeletedEvent fires when a Tailscale connector is deleted.
+	TailscaleConnectorDeletedEvent = "tailscale.deleted"
 	// OIDCConnectorCreatedEvent fires when OIDC connector is created/updated.
 	OIDCConnectorCreatedEvent = "oidc.created"
 	// OIDCConnectorDeletedEvent fires when OIDC connector is deleted.
