@@ -811,36 +811,41 @@ message UserSpecV2 {
     repeated ExternalIdentity GithubIdentities = 3
         [ (gogoproto.nullable) = false, (gogoproto.jsontag) = "github_identities,omitempty" ];
 
+    // TailscaleIdentities list associated tailscale identities
+    // that let user log in using externally verified identity
+    repeated ExternalIdentity TailscaleIdentities = 4
+        [ (gogoproto.nullable) = false, (gogoproto.jsontag) = "tailscale_identities,omitempty" ];
+
     // Roles is a list of roles assigned to user
-    repeated string Roles = 4 [ (gogoproto.jsontag) = "roles,omitempty" ];
+    repeated string Roles = 5 [ (gogoproto.jsontag) = "roles,omitempty" ];
 
     // Traits are key/value pairs received from an identity provider (through
     // OIDC claims or SAML assertions) or from a system administrator for local
     // accounts. Traits are used to populate role variables.
-    wrappers.LabelValues Traits = 5 [
+    wrappers.LabelValues Traits = 6 [
         (gogoproto.nullable) = false,
         (gogoproto.jsontag) = "traits,omitempty",
         (gogoproto.customtype) = "github.com/gravitational/teleport/lib/wrappers.Traits"
     ];
 
     // Status is a login status of the user
-    LoginStatus Status = 6
+    LoginStatus Status = 7
         [ (gogoproto.nullable) = false, (gogoproto.jsontag) = "status,omitempty" ];
 
     // Expires if set sets TTL on the user
-    google.protobuf.Timestamp Expires = 7 [
+    google.protobuf.Timestamp Expires = 8 [
         (gogoproto.stdtime) = true,
         (gogoproto.nullable) = false,
         (gogoproto.jsontag) = "expires"
     ];
 
     // CreatedBy holds information about agent or person created this user
-    CreatedBy CreatedBy = 8
+    CreatedBy CreatedBy = 9
         [ (gogoproto.nullable) = false, (gogoproto.jsontag) = "created_by,omitempty" ];
 
     // LocalAuths hold sensitive data necessary for performing local
     // authentication
-    LocalAuthSecrets LocalAuth = 9 [ (gogoproto.jsontag) = "local_auth,omitempty" ];
+    LocalAuthSecrets LocalAuth = 10 [ (gogoproto.jsontag) = "local_auth,omitempty" ];
 }
 
 // ExternalIdentity is OpenID Connect/SAML or Github identity that is linked

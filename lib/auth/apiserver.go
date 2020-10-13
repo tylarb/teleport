@@ -1759,6 +1759,117 @@ func (s *APIServer) validateGithubAuthCallback(auth ClientI, w http.ResponseWrit
 	return &raw, nil
 }
 
+// createTailscaleConnectorRawReq is a request to create a new Tailscale connector
+type createTailscaleConnectorRawReq struct {
+	// Connector is the connector data
+	Connector json.RawMessage `json:"connector"`
+}
+
+/* createTailscaleConnector creates a new Tailscale connector
+
+   POST /:version/tailscale/connectors
+
+   Success response: {"message": "ok"}
+*/
+func (s *APIServer) createTailscaleConnector(auth ClientI, w http.ResponseWriter, r *http.Request, p httprouter.Params, version string) (interface{}, error) {
+	var req createTailscaleConnectorRawReq
+	if err := httplib.ReadJSON(r, &req); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	connector, err := services.GetTailscaleConnectorMarshaler().Unmarshal(req.Connector)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if err := auth.CreateTailscaleConnector(connector); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return message("ok"), nil
+}
+
+// upsertTailscaleConnectorRawReq is a request to upsert a Tailscale connector
+type upsertTailscaleConnectorRawReq struct {
+	// Connector is the connector data
+	Connector json.RawMessage `json:"connector"`
+}
+
+/* upsertTailscaleConnector creates or updates a Tailscale connector
+
+   PUT /:version/tailscale/connectors
+
+   Success response: {"message": "ok"}
+*/
+func (s *APIServer) upsertTailscaleConnector(auth ClientI, w http.ResponseWriter, r *http.Request, p httprouter.Params, version string) (interface{}, error) {
+	var req upsertTailscaleConnectorRawReq
+	if err := httplib.ReadJSON(r, &req); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	connector, err := services.GetTailscaleConnectorMarshaler().Unmarshal(req.Connector)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if err := auth.UpsertTailscaleConnector(r.Context(), connector); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return message("ok"), nil
+}
+
+/* getTailscaleConnectors returns a list of all configured Tailscale connectors
+
+   GET /:version/tailscale/connectors
+
+   Success response: []services.TailscaleConnector
+*/
+func (s *APIServer) getTailscaleConnectors(auth ClientI, w http.ResponseWriter, r *http.Request, p httprouter.Params, version string) (interface{}, error) {
+	withSecrets, _, err := httplib.ParseBool(r.URL.Query(), "with_secrets")
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	connectors, err := auth.GetTailscaleConnectors(withSecrets)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	items := make([]json.RawMessage, len(connectors))
+	for i, connector := range connectors {
+		cbytes, err := services.GetTailscaleConnectorMarshaler().Marshal(connector, services.PreserveResourceID())
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		items[i] = cbytes
+	}
+	return items, nil
+}
+
+/* getTailscaleConnector returns the specified Tailscale connector
+
+   GET /:version/tailscale/connectors/:id
+
+   Success response: services.TailscaleConnector
+*/
+func (s *APIServer) getTailscaleConnector(auth ClientI, w http.ResponseWriter, r *http.Request, p httprouter.Params, version string) (interface{}, error) {
+	withSecrets, _, err := httplib.ParseBool(r.URL.Query(), "with_secrets")
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	connector, err := auth.GetTailscaleConnector(p.ByName("id"), withSecrets)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return rawMessage(services.GetTailscaleConnectorMarshaler().Marshal(connector, services.PreserveResourceID()))
+}
+
+/* deleteTailscaleConnector deletes the specified Tailscale connector
+
+   DELETE /:version/tailscale/connectors/:id
+
+   Success response: {"message": "ok"}
+*/
+func (s *APIServer) deleteTailscaleConnector(auth ClientI, w http.ResponseWriter, r *http.Request, p httprouter.Params, version string) (interface{}, error) {
+	if err := auth.DeleteTailscaleConnector(r.Context(), p.ByName("id")); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return message("ok"), nil
+}
+
 // tailscaleAuthReq is a request to authenticate via tailscale
 type tailscaleAuthReq struct {
 	// Req is the request parameters

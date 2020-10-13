@@ -44,6 +44,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/terminal"
+	"tailscale.com/net/interfaces"
 
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/lib/auth"
@@ -1664,7 +1665,7 @@ func (tc *TeleportClient) Login(ctx context.Context, activateKey bool) (*Key, er
 			return nil, trace.Wrap(err)
 		}
 	case teleport.Tailscale:
-		response, err = tc.tailscaleLogin(ctx, key.Pub)
+		response, err = tc.tailscaleLogin(ctx, pr.Auth.Tailscale.Name, key.Pub)
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
@@ -1979,35 +1980,6 @@ func (tc *TeleportClient) localLogin(ctx context.Context, secondFactor string, p
 	return response, nil
 }
 
-// tailscaleLogin
-func (tc *TeleportClient) tailscaleLogin(ctx context.Context, pub []byte) (*auth.SSHLoginResponse, error) {
-	addr, _, err := interfaces.Tailscale()
-
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-	if addr == nil {
-		return nil, trace.Wrap(errors.New("No Tailscale interface available, unable to connect"))
-	}
-
-	// ask the CA (via proxy) to sign our public key:
-	response, err := SSHAgentLogin(ctx, SSHLoginTailscale{
-		SSHLogin: SSHLogin{
-			ProxyAddr:         tc.WebProxyAddr,
-			PubKey:            pub,
-			TTL:               tc.KeyTTL,
-			Insecure:          tc.InsecureSkipVerify,
-			Pool:              loopbackPool(tc.WebProxyAddr),
-			Compatibility:     tc.CertificateFormat,
-			RouteToCluster:    tc.SiteName,
-			KubernetesCluster: tc.KubernetesCluster,
-		},
-		IP: addr.String(),
-	})
-
-	return response, trace.Wrap(err)
-}
-
 // AddTrustedCA adds a new CA as trusted CA for this client, used in tests
 func (tc *TeleportClient) AddTrustedCA(ca services.CertAuthority) error {
 	if tc.localAgent == nil {
@@ -2073,6 +2045,36 @@ func (tc *TeleportClient) directLogin(ctx context.Context, secondFactorType stri
 		User:     tc.Config.Username,
 		Password: password,
 		OTPToken: otpToken,
+	})
+
+	return response, trace.Wrap(err)
+}
+
+// tailscaleLogin
+func (tc *TeleportClient) tailscaleLogin(ctx context.Context, connectorID string, pub []byte) (*auth.SSHLoginResponse, error) {
+	addr, _, err := interfaces.Tailscale()
+
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	if addr == nil {
+		return nil, trace.Wrap(errors.New("No Tailscale interface available, unable to connect"))
+	}
+
+	// ask the CA (via proxy) to sign our public key:
+	response, err := SSHAgentTailscaleLogin(ctx, SSHLoginTailscale{
+		SSHLogin: SSHLogin{
+			ProxyAddr:         tc.WebProxyAddr,
+			PubKey:            pub,
+			TTL:               tc.KeyTTL,
+			Insecure:          tc.InsecureSkipVerify,
+			Pool:              loopbackPool(tc.WebProxyAddr),
+			Compatibility:     tc.CertificateFormat,
+			RouteToCluster:    tc.SiteName,
+			KubernetesCluster: tc.KubernetesCluster,
+		},
+		IP:          addr.String(),
+		ConnectorID: connectorID,
 	})
 
 	return response, trace.Wrap(err)

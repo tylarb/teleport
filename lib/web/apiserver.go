@@ -222,6 +222,10 @@ func NewHandler(cfg Config, opts ...HandlerOption) (*RewritingHandler, error) {
 	h.POST("/webapi/u2f/sessions", httplib.MakeHandler(h.createSessionWithU2FSignResponse))
 	h.POST("/webapi/u2f/certs", httplib.MakeHandler(h.createSSHCertWithU2FSignResponse))
 
+	// Tailscale connector handlers
+	h.POST("/webapi/tailscale/login/web", httplib.MakeHandler(h.tailscaleLoginWeb))
+	h.POST("/webapi/tailscale/login/console", httplib.MakeHandler(h.tailscaleLoginConsole))
+
 	// trusted clusters
 	h.POST("/webapi/trustedclusters/validate", httplib.MakeHandler(h.validateTrustedCluster))
 
@@ -931,6 +935,90 @@ func (h *Handler) oidcCallback(w http.ResponseWriter, r *http.Request, p httprou
 	}
 	http.Redirect(w, r, redirectURL.String(), http.StatusFound)
 	return nil, nil
+}
+
+func (h *Handler) tailscaleLoginWeb(w http.ResponseWriter, r *http.Request, p httprouter.Params) (interface{}, error) {
+	logger := log.WithFields(log.Fields{trace.Component: "tailscale"})
+	logger.Debug("Web login start.")
+
+	connectorID := r.URL.Query().Get("connector_id")
+	if connectorID == "" {
+		return nil, trace.BadParameter("missing connector_id query parameter")
+	}
+	ip := r.URL.Query().Get("ip")
+	if ip == "" {
+		return nil, trace.BadParameter("missing IP query parameter")
+	}
+
+	response, err := h.cfg.ProxyClient.AuthenticateTailscaleRequest(
+		services.TailscaleAuthRequest{
+			IP:               ip,
+			ConnectorID:      connectorID,
+			CreateWebSession: true,
+		})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	// if we created web session, set session cookie and redirect to original url
+	if response.Req.CreateWebSession {
+		logger.Infof("Callback is redirecting to web browser.")
+		err = SetSession(w, response.Username, response.Session.GetName())
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return nil, httplib.SafeRedirect(w, r, response.Req.ClientRedirectURL)
+	}
+	return nil, nil
+}
+
+func (h *Handler) tailscaleLoginConsole(w http.ResponseWriter, r *http.Request, p httprouter.Params) (interface{}, error) {
+	log.WithFields(log.Fields{trace.Component: "tailscale"}).Debug(
+		"Console login start.")
+	req := new(client.SSOLoginConsoleReq)
+	if err := httplib.ReadJSON(r, req); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	ip := r.URL.Query().Get("ip")
+	if ip == "" {
+		return nil, trace.BadParameter("missing IP query parameter")
+	}
+
+	if err := req.CheckAndSetDefaults(); err != nil {
+		return nil, trace.Wrap(err)
+	}
+	response, err := h.cfg.ProxyClient.AuthenticateTailscaleRequest(
+		services.TailscaleAuthRequest{
+			ConnectorID:       req.ConnectorID,
+			PublicKey:         req.PublicKey,
+			CertTTL:           req.CertTTL,
+			Compatibility:     req.Compatibility,
+			RouteToCluster:    req.RouteToCluster,
+			KubernetesCluster: req.KubernetesCluster,
+		})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	log.Infof("Callback is redirecting to console login.")
+	if len(response.Req.PublicKey) == 0 {
+		return nil, trace.BadParameter("not a web or console Tailscale login request")
+	}
+
+	redirectURL, err := ConstructSSHResponse(AuthParams{
+		ClientRedirectURL: response.Req.ClientRedirectURL,
+		Username:          response.Username,
+		Identity:          response.Identity,
+		Session:           response.Session,
+		Cert:              response.Cert,
+		TLSCert:           response.TLSCert,
+		HostSigners:       response.HostSigners,
+		FIPS:              h.cfg.FIPS,
+	})
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	http.Redirect(w, r, redirectURL.String(), http.StatusFound)
+	return nil, nil
+
 }
 
 // AuthParams are used to construct redirect URL containing auth
@@ -1979,35 +2067,6 @@ func (h *Handler) createSSHCertWithU2FSignResponse(w http.ResponseWriter, r *htt
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
-	return cert, nil
-}
-
-// createTailscaleCert is a web call that generates new SSH certificate based
-// on tailscale user access and public key user wishes to sign
-//
-// POST /v1/webapi/ssh/certs
-//
-// { "IP": "100.87.80.58", "pub_key": "key to sign", "ttl": 1000000000 }
-//
-// Success response
-//
-// { "cert": "base64 encoded signed cert", "host_signers": [{"domain_name": "example.com", "checking_keys": ["base64 encoded public signing key"]}] }
-//
-func (h *Handler) createTailscaleCert(w http.ResponseWriter, r *http.Request, p httprouter.Params) (interface{}, error) {
-	var req *client.CreateTailscaleCertReq
-	if err := httplib.ReadJSON(r, &req); err != nil {
-		return nil, trace.Wrap(err)
-	}
-
-	authClient := h.cfg.ProxyClient
-
-	var cert *auth.SSHLoginResponse
-
-	cert, err = h.auth.GetCertificateWithTailscale(*req)
-	if err != nil {
-		return nil, trace.Wrap(err)
-	}
-
 	return cert, nil
 }
 

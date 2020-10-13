@@ -2050,7 +2050,7 @@ func (c *Client) CreateTailscaleConnector(connector services.TailscaleConnector)
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	_, err = c.PostJSON(c.Endpoint("github", "connectors"), &createTailscaleConnectorRawReq{
+	_, err = c.PostJSON(c.Endpoint("tailscale", "connectors"), &createTailscaleConnectorRawReq{
 		Connector: bytes,
 	})
 	if err != nil {
@@ -2065,7 +2065,7 @@ func (c *Client) UpsertTailscaleConnector(ctx context.Context, connector service
 	if err != nil {
 		return trace.Wrap(err)
 	}
-	_, err = c.PutJSON(c.Endpoint("github", "connectors"), &upsertTailscaleConnectorRawReq{
+	_, err = c.PutJSON(c.Endpoint("tailscale", "connectors"), &upsertTailscaleConnectorRawReq{
 		Connector: bytes,
 	})
 	if err != nil {

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"net"
 
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/lib/defaults"
@@ -33,8 +34,8 @@ type TailscaleAuthResponse struct {
 }
 
 // AuthenticateTailscaleRequest checks that the request is coming from the tailscale network
-func (s *AuthServer) AuthenticateTailscaleRequest(req services.TailscaleAuthRequest) (*TailscaleAuthResponse, error) {
-	re, err := authenticateTailscaleRequest(req)
+func (a *AuthServer) AuthenticateTailscaleRequest(req services.TailscaleAuthRequest) (*TailscaleAuthResponse, error) {
+	re, err := a.authenticateTailscaleRequest(req)
 	event := &events.UserLogin{
 		Metadata: events.Metadata{
 			Type: events.UserLoginEvent,
@@ -65,21 +66,21 @@ func (s *AuthServer) authenticateTailscaleRequest(req services.TailscaleAuthRequ
 		return nil, trace.BadParameter("Missing IP")
 	}
 
-	if !interfaces.IsTailscaleIP(req.IP) {
-		log.Debugf("connecting IP is not a valid tailscale IP")
+	if !interfaces.IsTailscaleIP(net.ParseIP(req.IP)) {
+		logger.Debugf("connecting IP is not a valid tailscale IP")
 		return nil, trace.BadParameter(errMsg)
 	}
 
 	addr, _, err := interfaces.Tailscale()
 
 	if err != nil {
-		log.Debugf("Unable to collect interfaces on this host")
+		logger.Debugf("Unable to collect interfaces on this host")
 		return nil, trace.BadParameter(errMsg)
 	}
 
 	if addr == nil {
-		log.Debugf("No tailscale device on this host, not possible to be connected via tailscale")
-		return nil, trace.BadParamter(errMsg)
+		logger.Debugf("No tailscale device on this host, not possible to be connected via tailscale")
+		return nil, trace.BadParameter(errMsg)
 	}
 
 	// Auth was successful, continue
@@ -88,7 +89,7 @@ func (s *AuthServer) authenticateTailscaleRequest(req services.TailscaleAuthRequ
 		return nil, trace.Wrap(err)
 	}
 
-	params, err := s.calculateTailscaleUser(connector, req)
+	params, err := s.calculateTailscaleUser(connector, &req)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
@@ -99,7 +100,7 @@ func (s *AuthServer) authenticateTailscaleRequest(req services.TailscaleAuthRequ
 	}
 
 	re := &TailscaleAuthResponse{
-		Req: *req,
+		Req: req,
 		Identity: services.ExternalIdentity{
 			ConnectorID: params.connectorName,
 			Username:    params.username,
@@ -114,7 +115,7 @@ func (s *AuthServer) authenticateTailscaleRequest(req services.TailscaleAuthRequ
 			return nil, trace.Wrap(err)
 		}
 
-		re.auth.Session = session
+		re.Session = session
 	}
 
 	// If a public key was provided, sign it and return a certificate.
@@ -129,8 +130,8 @@ func (s *AuthServer) authenticateTailscaleRequest(req services.TailscaleAuthRequ
 			return nil, trace.Wrap(err)
 		}
 
-		re.auth.Cert = sshCert
-		re.auth.TLSCert = tlsCert
+		re.Cert = sshCert
+		re.TLSCert = tlsCert
 
 		// Return the host CA for this cluster only.
 		authority, err := s.GetCertAuthority(services.CertAuthID{
@@ -140,7 +141,7 @@ func (s *AuthServer) authenticateTailscaleRequest(req services.TailscaleAuthRequ
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
-		re.auth.HostSigners = append(re.auth.HostSigners, authority)
+		re.HostSigners = append(re.HostSigners, authority)
 	}
 
 	return re, nil
@@ -194,10 +195,10 @@ func (s *AuthServer) deleteTailscaleConnector(ctx context.Context, connectorName
 	return nil
 }
 
-func (s *AuthServer) calculateTailscaleUser(connector services.TailscaleConnector, ip string, request *services.TailscaleAuthRequest) (*createUserParams, error) {
+func (s *AuthServer) calculateTailscaleUser(connector services.TailscaleConnector, request *services.TailscaleAuthRequest) (*createUserParams, error) {
 	p := createUserParams{
 		connectorName: connector.GetName(),
-		username:      "Tailscale" + ip,
+		username:      "Tailscale" + request.IP,
 	}
 
 	// Calculate logins, kubegroups, roles, and traits.
@@ -224,8 +225,8 @@ func (s *AuthServer) calculateTailscaleUser(connector services.TailscaleConnecto
 func (s *AuthServer) createTailscaleUser(p *createUserParams) (services.User, error) {
 
 	log.WithFields(logrus.Fields{trace.Component: "tailscale"}).Debugf(
-		"Generating dynamic identity %v/%v with logins: %v.",
-		p.connectorName, p.ip)
+		"Generating dynamic identity %v using connector %v",
+		p.username, p.connectorName)
 
 	expires := s.GetClock().Now().UTC().Add(p.sessionTTL)
 

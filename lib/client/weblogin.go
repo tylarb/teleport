@@ -139,17 +139,18 @@ type CreateSSHCertWithU2FReq struct {
 	KubernetesCluster string
 }
 
-// CreateTailscaleCertReq are passed by web client
+// CreateSSHCertWithU2FReq are passed by web client
 // to authenticate against teleport server and receive
 // a temporary cert signed by auth server authority
-type CreateTailscaleCertReq struct {
-	// IP is the IP of the requesting tailscale client
-	IP string `json:"IP"`
-	// PubKey is a public key user wishes to sign
-	PubKey []byte `json:"pub_key"`
+type CreateSSHCertWithTailscaleReq struct {
+	RedirectURL string `json:"redirect_url"`
+	// User is a teleport connecting IP
+	IP          string `json:"ip"`
+	ConnectorID string `json:"connector_id"`
+	PublicKey   []byte `json:"public_key"`
 	// TTL is a desired TTL for the cert (max is still capped by server,
 	// however user can shorten the time)
-	TTL time.Duration `json:"ttl"`
+	CertTTL time.Duration `json:"cert_ttl"`
 	// Compatibility specifies OpenSSH compatibility flags.
 	Compatibility string `json:"compatibility,omitempty"`
 	// RouteToCluster is an optional cluster name to route the response
@@ -223,11 +224,14 @@ type SSHLoginDirect struct {
 	OTPToken string
 }
 
-// SSHLoginTailscale contains SSH login parameters for teleport (ip/
+// SSHLoginTailscale contains SSH login parameters for tailscale (IP)
 // login.
 type SSHLoginTailscale struct {
+	// ConnectorID is the OIDC or SAML connector ID to use
+	ConnectorID string
+
 	SSHLogin
-	// IP is the login IP.
+	// User is the login IP.
 	IP string
 }
 
@@ -293,6 +297,8 @@ type AuthenticationSettings struct {
 	SAML *SAMLSettings `json:"saml,omitempty"`
 	// Github contains Github connector settings needed for authentication.
 	Github *GithubSettings `json:"github,omitempty"`
+	// Tailscale contains Tailscale connector settings needed for authentication
+	Tailscale *TailscaleSettings `json:"tailscale,omitempty"`
 }
 
 // U2FSettings contains the AppID for Universal Second Factor.
@@ -319,6 +325,14 @@ type OIDCSettings struct {
 
 // GithubSettings contains the Name and Display string for Github connector.
 type GithubSettings struct {
+	// Name is the internal name of the connector
+	Name string `json:"name"`
+	// Display is the connector display name
+	Display string `json:"display"`
+}
+
+// TailscaleSettings contains the Name and Display string for Tailscale connector.
+type TailscaleSettings struct {
 	// Name is the internal name of the connector
 	Name string `json:"name"`
 	// Display is the connector display name
@@ -518,16 +532,16 @@ func SSHAgentLogin(ctx context.Context, login SSHLoginDirect) (*auth.SSHLoginRes
 }
 
 // SSHTailscaleLogin is used by tsh to validate tailscale auth and login as tailscale user.
-func SSHTailscaleLogin(ctx context.Context, login SSHLoginTailscale) (*auth.SSHLoginResponse, error) {
+func SSHAgentTailscaleLogin(ctx context.Context, login SSHLoginTailscale) (*auth.SSHLoginResponse, error) {
 	clt, _, err := initClient(login.ProxyAddr, login.Insecure, login.Pool)
 	if err != nil {
 		return nil, trace.Wrap(err)
 	}
 
-	re, err := clt.PostJSON(ctx, clt.Endpoint("webapi", "ssh", "certs"), CreateSSHCertReq{
+	re, err := clt.PostJSON(ctx, clt.Endpoint("webapi", "tailscale", "login", "console"), CreateSSHCertWithTailscaleReq{
 		IP:                login.IP,
-		PubKey:            login.PubKey,
-		TTL:               login.TTL,
+		PublicKey:         login.PubKey,
+		CertTTL:           login.TTL,
 		Compatibility:     login.Compatibility,
 		RouteToCluster:    login.RouteToCluster,
 		KubernetesCluster: login.KubernetesCluster,

@@ -903,6 +903,36 @@ message SAMLConnectorDelete {
         [ (gogoproto.nullable) = false, (gogoproto.embed) = true, (gogoproto.jsontag) = "" ];
 }
 
+// TailscaleConnectorCreate fires when a Tailscale connector is created/updated.
+message TailscaleConnectorCreate {
+    // Metadata is a common event metadata
+    Metadata Metadata = 1
+        [ (gogoproto.nullable) = false, (gogoproto.embed) = true, (gogoproto.jsontag) = "" ];
+
+    // ResourceMetadata is a common resource event metadata
+    ResourceMetadata Resource = 2
+        [ (gogoproto.nullable) = false, (gogoproto.embed) = true, (gogoproto.jsontag) = "" ];
+
+    // User is a common user event metadata
+    UserMetadata User = 3
+        [ (gogoproto.nullable) = false, (gogoproto.embed) = true, (gogoproto.jsontag) = "" ];
+}
+
+// TailscaleConnectorDelete fires when a Tailscale connector is deleted.
+message TailscaleConnectorDelete {
+    // Metadata is a common event metadata
+    Metadata Metadata = 1
+        [ (gogoproto.nullable) = false, (gogoproto.embed) = true, (gogoproto.jsontag) = "" ];
+
+    // ResourceMetadata is a common resource event metadata
+    ResourceMetadata Resource = 2
+        [ (gogoproto.nullable) = false, (gogoproto.embed) = true, (gogoproto.jsontag) = "" ];
+
+    // User is a common user event metadata
+    UserMetadata User = 3
+        [ (gogoproto.nullable) = false, (gogoproto.embed) = true, (gogoproto.jsontag) = "" ];
+}
+
 // OneOf is a union of one of audit events submitted to the auth service
 message OneOf {
     // Event is one of the audit events
@@ -942,6 +972,8 @@ message OneOf {
         events.OIDCConnectorDelete OIDCConnectorDelete = 33;
         events.SAMLConnectorCreate SAMLConnectorCreate = 34;
         events.SAMLConnectorDelete SAMLConnectorDelete = 35;
+        events.TailscaleConnectorCreate TailscaleConnectorCreate = 36;
+        events.TailscaleConnectorDelete TailscaleConnectorDelete = 37;
     }
 }
 

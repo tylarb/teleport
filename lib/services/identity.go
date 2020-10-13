@@ -331,9 +331,14 @@ type TailscaleAuthRequest struct {
 	Type string `json:"type"`
 	// PublicKey is an optional public key to sign in case of successful auth
 	PublicKey []byte `json:"public_key"`
+	// CertTTL is TTL of the cert that's generated in case of successful auth
+	CertTTL time.Duration `json:"cert_ttl"`
 	// CreateWebSession indicates that a user wants to generate a web session
 	// after successul authentication
 	CreateWebSession bool `json:"create_web_session"`
+	// ClientRedirectURL is a URL client wants to be redirected
+	// after successful authentication
+	ClientRedirectURL string `json:"client_redirect_url"`
 	// Compatibility specifies OpenSSH compatibility flags
 	Compatibility string `json:"compatibility,omitempty"`
 	// Expires is a global expiry time header can be set on any resource in the system.
