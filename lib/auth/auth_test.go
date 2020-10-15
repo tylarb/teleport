@@ -848,6 +848,27 @@ func (s *AuthSuite) TestGithubConnectorCRUDEventsEmitted(c *C) {
 	c.Assert(s.mockEmitter.LastEvent().GetType(), DeepEquals, events.GithubConnectorDeletedEvent)
 }
 
+func (s *AuthSuite) TestTailscaleConnectorCRUDEventsEmitted(c *C) {
+	ctx := context.Background()
+	// test tailscale create event
+	tailscale := services.NewTailscaleConnector("test", services.TailscaleConnectorSpecV1{})
+	err := s.a.upsertTailscaleConnector(ctx, tailscale)
+	c.Assert(err, IsNil)
+	c.Assert(s.mockEmitter.LastEvent().GetType(), DeepEquals, events.TailscaleConnectorCreatedEvent)
+	s.mockEmitter.Reset()
+
+	// test tailscale update event
+	err = s.a.upsertTailscaleConnector(ctx, tailscale)
+	c.Assert(err, IsNil)
+	c.Assert(s.mockEmitter.LastEvent().GetType(), DeepEquals, events.TailscaleConnectorCreatedEvent)
+	s.mockEmitter.Reset()
+
+	// test tailscale delete event
+	err = s.a.deleteTailscaleConnector(ctx, "test")
+	c.Assert(err, IsNil)
+	c.Assert(s.mockEmitter.LastEvent().GetType(), DeepEquals, events.TailscaleConnectorDeletedEvent)
+}
+
 func (s *AuthSuite) TestOIDCConnectorCRUDEventsEmitted(c *C) {
 	ctx := context.Background()
 	// test oidc create event

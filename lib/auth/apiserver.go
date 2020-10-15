@@ -227,6 +227,14 @@ func NewAPIServer(config *APIConfig) http.Handler {
 	srv.POST("/:version/github/requests/create", srv.withAuth(srv.createGithubAuthRequest))
 	srv.POST("/:version/github/requests/validate", srv.withAuth(srv.validateGithubAuthCallback))
 
+	// Tailscale connector
+	srv.POST("/:version/tailscale/connectors", srv.withAuth(srv.createTailscaleConnector))
+	srv.PUT("/:version/tailscale/connectors", srv.withAuth(srv.upsertTailscaleConnector))
+	srv.GET("/:version/tailscale/connectors", srv.withAuth(srv.getTailscaleConnectors))
+	srv.GET("/:version/tailscale/connectors/:id", srv.withAuth(srv.getTailscaleConnector))
+	srv.DELETE("/:version/tailscale/connectors/:id", srv.withAuth(srv.deleteTailscaleConnector))
+	srv.POST("/:version/tailscale/requests/authenticate", srv.withAuth(srv.authenticateTailscaleRequest))
+
 	// U2F
 	srv.GET("/:version/u2f/signuptokens/:token", srv.withAuth(srv.getSignupU2FRegisterRequest))
 	srv.POST("/:version/u2f/users/:user/sign", srv.withAuth(srv.u2fSignRequest))

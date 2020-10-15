@@ -1,5 +1,4 @@
-/*
-Copyright 2015-2019 Gravitational, Inc.
+/* Copyright 2015-2019 Gravitational, Inc.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -76,10 +75,11 @@ Same as above, but using JSON output:
 // Initialize allows ResourceCommand to plug itself into the CLI parser
 func (rc *ResourceCommand) Initialize(app *kingpin.Application, config *service.Config) {
 	rc.CreateHandlers = map[ResourceKind]ResourceCreateHandler{
-		services.KindUser:            rc.createUser,
-		services.KindTrustedCluster:  rc.createTrustedCluster,
-		services.KindGithubConnector: rc.createGithubConnector,
-		services.KindCertAuthority:   rc.createCertAuthority,
+		services.KindUser:               rc.createUser,
+		services.KindTrustedCluster:     rc.createTrustedCluster,
+		services.KindGithubConnector:    rc.createGithubConnector,
+		services.KindTailscaleConnector: rc.createTailscaleConnector,
+		services.KindCertAuthority:      rc.createCertAuthority,
 	}
 	rc.config = config
 
@@ -312,6 +312,30 @@ func (rc *ResourceCommand) createGithubConnector(client auth.ClientI, raw servic
 	return nil
 }
 
+// createTailscaleConnector creates a Tailscale connector
+func (rc *ResourceCommand) createTailscaleConnector(client auth.ClientI, raw services.UnknownResource) error {
+	connector, err := services.GetTailscaleConnectorMarshaler().Unmarshal(raw.Raw)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	_, err = client.GetTailscaleConnector(connector.GetName(), false)
+	if err != nil && !trace.IsNotFound(err) {
+		return trace.Wrap(err)
+	}
+	exists := (err == nil)
+	if !rc.force && exists {
+		return trace.AlreadyExists("authentication connector %q already exists",
+			connector.GetName())
+	}
+	err = client.UpsertTailscaleConnector(context.TODO(), connector)
+	if err != nil {
+		return trace.Wrap(err)
+	}
+	fmt.Printf("authentication connector %q has been %s\n",
+		connector.GetName(), UpsertVerb(exists, rc.force))
+	return nil
+}
+
 // createUser implements 'tctl create user.yaml' command.
 func (rc *ResourceCommand) createUser(client auth.ClientI, raw services.UnknownResource) error {
 	user, err := services.GetUserMarshaler().UnmarshalUser(raw.Raw)
@@ -383,6 +407,11 @@ func (rc *ResourceCommand) Delete(client auth.ClientI) (err error) {
 			return trace.Wrap(err)
 		}
 		fmt.Printf("github connector %q has been deleted\n", rc.ref.Name)
+	case services.KindTailscaleConnector:
+		if err = client.DeleteTailscaleConnector(ctx, rc.ref.Name); err != nil {
+			return trace.Wrap(err)
+		}
+		fmt.Printf("tailscale connector %q has been deleted\n", rc.ref.Name)
 	case services.KindReverseTunnel:
 		if err := client.DeleteReverseTunnel(rc.ref.Name); err != nil {
 			return trace.Wrap(err)

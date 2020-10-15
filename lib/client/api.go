@@ -1669,6 +1669,11 @@ func (tc *TeleportClient) Login(ctx context.Context, activateKey bool) (*Key, er
 		if err != nil {
 			return nil, trace.Wrap(err)
 		}
+		// in this case identity is returned by the proxy
+		tc.Username = response.Username
+		if tc.localAgent != nil {
+			tc.localAgent.username = response.Username
+		}
 	case teleport.OIDC:
 		response, err = tc.ssoLogin(ctx, pr.Auth.OIDC.Name, key.Pub, teleport.OIDC)
 		if err != nil {

@@ -203,7 +203,7 @@ func (c *AuthPreferenceV2) CheckAndSetDefaults() error {
 
 	// make sure type makes sense
 	switch c.Spec.Type {
-	case teleport.Local, teleport.OIDC, teleport.SAML, teleport.Github:
+	case teleport.Local, teleport.OIDC, teleport.SAML, teleport.Github, teleport.Tailscale:
 	default:
 		return trace.BadParameter("authentication type %q not supported", c.Spec.Type)
 	}

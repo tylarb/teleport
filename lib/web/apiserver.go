@@ -412,12 +412,17 @@ func localSettings(authClient auth.ClientI, cap services.AuthPreference) (client
 	return as, nil
 }
 
-func tailscaleSettings(authClient auth.ClientI, cap services.AuthPreference) (client.AuthenticationSettings, error) {
+func tailscaleSettings(connector services.TailscaleConnector, cap services.AuthPreference) client.AuthenticationSettings {
 	as := client.AuthenticationSettings{
 		Type: teleport.Tailscale,
+		Tailscale: &client.TailscaleSettings{
+			Name:    connector.GetName(),
+			Display: connector.GetDisplay(),
+		},
+		SecondFactor: cap.GetSecondFactor(),
 	}
 
-	return as, nil
+	return as
 }
 
 func oidcSettings(connector services.OIDCConnector, cap services.AuthPreference) client.AuthenticationSettings {
@@ -466,11 +471,6 @@ func defaultAuthenticationSettings(authClient auth.ClientI) (client.Authenticati
 	switch cap.GetType() {
 	case teleport.Local:
 		as, err = localSettings(authClient, cap)
-		if err != nil {
-			return client.AuthenticationSettings{}, trace.Wrap(err)
-		}
-	case teleport.Tailscale:
-		as, err = tailscaleSettings(authClient, cap)
 		if err != nil {
 			return client.AuthenticationSettings{}, trace.Wrap(err)
 		}
@@ -529,6 +529,24 @@ func defaultAuthenticationSettings(authClient auth.ClientI) (client.Authenticati
 			}
 			as = githubSettings(githubConnectors[0], cap)
 		}
+	case teleport.Tailscale:
+		if cap.GetConnectorName() != "" {
+			tailscaleConnector, err := authClient.GetTailscaleConnector(cap.GetConnectorName(), false)
+			if err != nil {
+				return client.AuthenticationSettings{}, trace.Wrap(err)
+			}
+			as = tailscaleSettings(tailscaleConnector, cap)
+		} else {
+			tailscaleConnectors, err := authClient.GetTailscaleConnectors(false)
+			if err != nil {
+				return client.AuthenticationSettings{}, trace.Wrap(err)
+			}
+			if len(tailscaleConnectors) == 0 {
+				return client.AuthenticationSettings{}, trace.BadParameter("no tailscale connectors found")
+			}
+			as = tailscaleSettings(tailscaleConnectors[0], cap)
+		}
+
 	default:
 		return client.AuthenticationSettings{}, trace.BadParameter("unknown type %v", cap.GetType())
 	}
@@ -583,15 +601,6 @@ func (h *Handler) pingWithConnector(w http.ResponseWriter, r *http.Request, p ht
 		return response, nil
 	}
 
-	if connectorName == teleport.Tailscale {
-		as, err := tailscaleSettings(h.cfg.ProxyClient, cap)
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		response.Auth = as
-		return response, nil
-	}
-
 	// first look for a oidc connector with that name
 	oidcConnector, err := authClient.GetOIDCConnector(connectorName, false)
 	if err == nil {
@@ -610,6 +619,13 @@ func (h *Handler) pingWithConnector(w http.ResponseWriter, r *http.Request, p ht
 	githubConnector, err := authClient.GetGithubConnector(connectorName, false)
 	if err == nil {
 		response.Auth = githubSettings(githubConnector, cap)
+		return response, nil
+	}
+
+	// look for tailscale connector
+	tailscaleConnector, err := authClient.GetTailscaleConnector(connectorName, false)
+	if err == nil {
+		response.Auth = tailscaleSettings(tailscaleConnector, cap)
 		return response, nil
 	}
 
